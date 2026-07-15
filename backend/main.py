@@ -96,6 +96,9 @@ async def scan_phone(request: PhoneScanRequest):
             res = await client.get(url, params=params, timeout=10.0)
             res.raise_for_status()
             data = res.json()
+    except httpx.HTTPStatusError as e:
+        error_body = e.response.text
+        raise HTTPException(status_code=500, detail=f"Google API Error (HTTP {e.response.status_code}): {error_body}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OSINT Search failed: {str(e)}")
 
