@@ -46,7 +46,7 @@ async def scan_phone(request: PhoneScanRequest):
         if not phonenumbers.is_valid_number(parsed_number):
             raise ValueError("Invalid number")
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Invalid phone number format.")
+        raise HTTPException(status_code=400, detail="Invalid phone number format. Please include the country code (e.g., +62 8...).")
 
     # Extract Region/Country and Carrier
     country = geocoder.description_for_number(parsed_number, "en")
