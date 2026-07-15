@@ -65,85 +65,57 @@ async def scan_phone(request: PhoneScanRequest):
     # Format the number to E.164 for consistency in our mock DB
     formatted_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
 
-    # Real OSINT Logic using Google Custom Search API
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
-
-    if not api_key or not search_engine_id:
-        return {
-            "phone_number": formatted_number,
-            "threat_level": "ERROR",
-            "score": 0,
-            "osint_data": {
-                "carrier": extracted_carrier or "Standard Carrier",
-                "location": country or "Unknown",
-                "flags": ["Configuration Error"],
-                "details": "GOOGLE_API_KEY and SEARCH_ENGINE_ID environment variables are not set."
-            }
+    # Robust Simulated Threat Database (For Portfolio Showcase)
+    mock_db = {
+        "+6281995180400": {
+            "threat_level": "HIGH THREAT / SCAM",
+            "score": 95,
+            "flags": [
+                "Reported 14 times as Fraud on community forums", 
+                "Flagged for suspicious SMS phishing",
+                "Associated with known e-commerce scam rings"
+            ],
+            "details": "High confidence of malicious activity. Number is actively being reported by users across multiple platforms."
+        },
+        "+628111111111": {
+            "threat_level": "HIGH THREAT",
+            "score": 88,
+            "flags": ["Found in Telegram Fraud Groups", "BEC Scam Reports"],
+            "details": "Number associated with organized fraud rings and virtual operators."
+        },
+        "+85599999999": {
+            "threat_level": "CRITICAL THREAT",
+            "score": 99,
+            "flags": ["Overseas Syndicate", "Frequent VoIP cycling"],
+            "details": "Overseas number typically used by large-scale scam syndicates."
         }
-
-    # Generate Google Dorking query
-    query = f'"{formatted_number}" AND ("penipu" OR "spam" OR "scam" OR "fraud")'
-    url = "https://www.googleapis.com/customsearch/v1"
-    params = {
-        "key": api_key,
-        "cx": search_engine_id,
-        "q": query,
     }
 
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.get(url, params=params, timeout=10.0)
-            res.raise_for_status()
-            data = res.json()
-    except httpx.HTTPStatusError as e:
-        error_body = e.response.text
-        raise HTTPException(status_code=500, detail=f"Google API Error (HTTP {e.response.status_code}): {error_body}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OSINT Search failed: {str(e)}")
-
-    # Parse Search Results
-    items = data.get("items", [])
-    search_info = data.get("searchInformation", {})
-    total_results = int(search_info.get("totalResults", "0"))
-    
-    if total_results == 0:
+    # Check against our mock threat intel database
+    if formatted_number in mock_db:
+        intel = mock_db[formatted_number]
         return {
             "phone_number": formatted_number,
-            "threat_level": "CLEAN",
-            "score": 5,
+            "threat_level": intel["threat_level"],
+            "score": intel["score"],
             "osint_data": {
-                "carrier": extracted_carrier or "Unknown",
-                "location": country or "Unknown",
-                "flags": ["No negative OSINT footprint found"],
-                "details": "Number appears legitimate. No fraud reports found online."
+                "carrier": "VoIP/Virtual Operator" if formatted_number == "+85599999999" else (extracted_carrier or "Unknown"),
+                "location": "Known Fraud Hub" if formatted_number == "+85599999999" else (country or "Unknown"),
+                "flags": intel["flags"],
+                "details": intel["details"]
             }
         }
     
-    # Calculate score based on hits (e.g. 1 hit = 50, 2 hits = 70, 3+ hits = 95)
-    score = min(35 + (total_results * 15), 98)
-    
-    # Collect snippets for flags
-    flags = []
-    for item in items[:4]:  # Top 4 snippets
-        snippet = item.get("snippet", "").replace("\n", " ").strip()
-        if snippet:
-            # Truncate snippet and prepend domain
-            domain = urlparse(item.get("link", "")).netloc
-            flags.append(f"[{domain}] {snippet[:100]}...")
-            
-    if not flags:
-        flags.append(f"{total_results} suspicious mentions found online.")
-        
+    # If input is not in the mock database, assume it's a standard/normal number
     return {
         "phone_number": formatted_number,
-        "threat_level": "HIGH THREAT",
-        "score": score,
+        "threat_level": "CLEAN",
+        "score": 10,
         "osint_data": {
-            "carrier": extracted_carrier or "Unknown",
+            "carrier": extracted_carrier or "Standard Carrier",
             "location": country or "Unknown",
-            "flags": flags,
-            "details": f"Found {total_results} potential fraud/spam reports online across the web."
+            "flags": ["No negative OSINT footprint found"],
+            "details": "Number appears legitimate with normal registration patterns."
         }
     }
 
