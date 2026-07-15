@@ -1,3 +1,5 @@
+import os
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -60,31 +62,82 @@ async def scan_phone(request: PhoneScanRequest):
     # Format the number to E.164 for consistency in our mock DB
     formatted_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
 
-    # Logic 2 & Conditional Rules (Mock HLR & OSINT)
-    # Check against our mock threat intel database
-    if formatted_number in ["+628111111111", "+85599999999"]:
+    # Real OSINT Logic using Google Custom Search API
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
+
+    if not api_key or not search_engine_id:
         return {
             "phone_number": formatted_number,
-            "threat_level": "HIGH",
-            "score": 92,
+            "threat_level": "ERROR",
+            "score": 0,
             "osint_data": {
-                "carrier": "VoIP/Virtual Operator",
-                "location": "Known Fraud Hub" if formatted_number == "+85599999999" else country,
-                "flags": ["Found in Telegram Fraud Groups", "BEC Scam Reports"],
-                "details": "High confidence of malicious activity. Number associated with organized fraud rings."
+                "carrier": extracted_carrier or "Standard Carrier",
+                "location": country or "Unknown",
+                "flags": ["Configuration Error"],
+                "details": "GOOGLE_API_KEY and SEARCH_ENGINE_ID environment variables are not set."
+            }
+        }
+
+    # Generate Google Dorking query
+    query = f'"{formatted_number}" AND ("penipu" OR "spam" OR "scam" OR "fraud")'
+    url = "https://www.googleapis.com/customsearch/v1"
+    params = {
+        "key": api_key,
+        "cx": search_engine_id,
+        "q": query,
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, params=params, timeout=10.0)
+            res.raise_for_status()
+            data = res.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OSINT Search failed: {str(e)}")
+
+    # Parse Search Results
+    items = data.get("items", [])
+    search_info = data.get("searchInformation", {})
+    total_results = int(search_info.get("totalResults", "0"))
+    
+    if total_results == 0:
+        return {
+            "phone_number": formatted_number,
+            "threat_level": "CLEAN",
+            "score": 5,
+            "osint_data": {
+                "carrier": extracted_carrier or "Unknown",
+                "location": country or "Unknown",
+                "flags": ["No negative OSINT footprint found"],
+                "details": "Number appears legitimate. No fraud reports found online."
             }
         }
     
-    # If input is a standard/normal number
+    # Calculate score based on hits (e.g. 1 hit = 50, 2 hits = 70, 3+ hits = 95)
+    score = min(35 + (total_results * 15), 98)
+    
+    # Collect snippets for flags
+    flags = []
+    for item in items[:4]:  # Top 4 snippets
+        snippet = item.get("snippet", "").replace("\n", " ").strip()
+        if snippet:
+            # Truncate snippet and prepend domain
+            domain = urlparse(item.get("link", "")).netloc
+            flags.append(f"[{domain}] {snippet[:100]}...")
+            
+    if not flags:
+        flags.append(f"{total_results} suspicious mentions found online.")
+        
     return {
         "phone_number": formatted_number,
-        "threat_level": "CLEAN",
-        "score": 10,
+        "threat_level": "HIGH THREAT",
+        "score": score,
         "osint_data": {
-            "carrier": extracted_carrier or "Standard Carrier",
+            "carrier": extracted_carrier or "Unknown",
             "location": country or "Unknown",
-            "flags": ["No negative OSINT footprint found"],
-            "details": "Number appears legitimate with normal registration patterns."
+            "flags": flags,
+            "details": f"Found {total_results} potential fraud/spam reports online across the web."
         }
     }
 
