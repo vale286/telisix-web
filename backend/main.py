@@ -32,7 +32,7 @@ class UrlScanRequest(BaseModel):
 # ---------------------------------------------------------
 # Endpoint 1: Phone Number OSINT & HLR Simulation
 # ---------------------------------------------------------
-@app.post("/api/scan-phone")
+@app.post("/api/backend/scan-phone")
 async def scan_phone(request: PhoneScanRequest):
     """
     Simulates Home Location Register (HLR) lookups and OSINT scraping (e.g., PhoneInfoga).
@@ -87,7 +87,7 @@ async def scan_phone(request: PhoneScanRequest):
 # ---------------------------------------------------------
 # Endpoint 2: Phishing Link & Domain Scanner
 # ---------------------------------------------------------
-@app.post("/api/scan-url")
+@app.post("/api/backend/scan-url")
 async def scan_url(request: UrlScanRequest):
     """
     Simulates WHOIS lookup for domain age to detect newly registered phishing domains,

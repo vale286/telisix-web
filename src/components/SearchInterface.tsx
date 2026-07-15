@@ -68,7 +68,7 @@ export default function SearchInterface() {
 
       const basePath = process.env.NODE_ENV === "production"
         ? "/api/backend"
-        : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api");
+        : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/backend");
 
       const response = await fetch(`${basePath}${endpoint}`, {
         method: "POST",
