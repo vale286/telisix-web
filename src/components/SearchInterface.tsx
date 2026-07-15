@@ -61,13 +61,16 @@ export default function SearchInterface() {
     }, 200);
 
     try {
-      const endpoint = activeTab === "phone" ? "/api/scan-phone" : "/api/scan-url";
+      const endpoint = activeTab === "phone" ? "/scan-phone" : "/scan-url";
       const payload = activeTab === "phone" 
         ? { phone_number: inputValue } 
         : { url_string: inputValue };
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${baseUrl}${endpoint}`, {
+      const basePath = process.env.NODE_ENV === "production"
+        ? "/api/backend"
+        : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api");
+
+      const response = await fetch(`${basePath}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
