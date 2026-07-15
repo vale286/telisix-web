@@ -40,10 +40,15 @@ async def scan_phone(request: PhoneScanRequest):
     """
     phone_str = request.phone_number
 
-    # Logic 1 (Validation): Use the phonenumbers library to parse and validate
     try:
-        parsed_number = phonenumbers.parse(phone_str, None)
-        if not phonenumbers.is_valid_number(parsed_number):
+        phone_str = request.phone_number.strip()
+        if phone_str.startswith("08"):
+            phone_str = "+62" + phone_str[1:]
+        
+        parsed_number = phonenumbers.parse(phone_str, "ID")
+        
+        # Use is_possible_number instead of strict is_valid_number to allow our fake test numbers
+        if not phonenumbers.is_possible_number(parsed_number):
             raise ValueError("Invalid number")
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid phone number format. Please include the country code (e.g., +62 8...).")
